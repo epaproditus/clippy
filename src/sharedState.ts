@@ -15,6 +15,10 @@ export interface SettingsState {
   remoteEndpoint?: string;
   remoteModel?: string;
   remoteApiKey?: string;
+  mcpEnabled?: boolean;
+  mcpServerCommand?: string;
+  mcpServerArgs?: string;
+  mcpServerCwd?: string;
   clippyAlwaysOnTop?: boolean;
   chatAlwaysOnTop?: boolean;
   alwaysOpenChat?: boolean;
@@ -52,6 +56,10 @@ export const DEFAULT_SETTINGS: SettingsState = {
   remoteEndpoint: "https://api.openai.com/v1/chat/completions",
   remoteModel: "",
   remoteApiKey: "",
+  mcpEnabled: false,
+  mcpServerCommand: "",
+  mcpServerArgs: "",
+  mcpServerCwd: "",
   topK: 10,
   temperature: 0.7,
   defaultFont: "Tahoma",

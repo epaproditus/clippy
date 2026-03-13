@@ -11,6 +11,7 @@ It is also meant to be a reference implementation of [@electron/llm](https://git
 - Simple, familiar, and classic chat interface. Send messages to your models, get a response.
 - Batteries included: No complicated setup. Just open the app and chat away. Thanks to llama.cpp and `node-llama-cpp`, the app will automatically discover the most efficient way to run your models (Metal, CUDA, Vulkan, etc).
 - Optional remote mode: Point Clippy at an OpenAI-compatible endpoint and model from Settings > Model.
+- Optional MCP tools in remote mode: Configure a stdio MCP server command and let Clippy call tools during a chat turn.
 - Custom models, prompts, and parameters: Load your own downloaded models and play with the settings.
 - Offline by default: Clippy runs locally unless you explicitly enable a remote endpoint in settings.
 
@@ -21,6 +22,20 @@ Countless little chat apps for local LLMs exist out there. Many of them are like
 ## Downloading More Models
 
 Clippy supports (thanks to Llama.cpp) most GGUF models. You can find GGUF models in plenty of online sources - I tend to go with models quantized by [TheBloke](https://huggingface.co/thebloke) or [Unsloth](https://huggingface.co/unsloth).
+
+## MCP Setup (Remote Mode)
+
+When using the remote provider, you can enable MCP tools in `Settings > Model`.
+
+Basic setup example:
+
+1. Choose `Remote API (OpenAI-compatible)`.
+2. Set endpoint, model, and API key.
+3. Enable `MCP tools`.
+4. Set `MCP Server Command` to `npx`.
+5. Set `MCP Server Args` to `-y @modelcontextprotocol/server-filesystem /path/to/your/workspace`.
+
+Use a remote model that supports tool calling for best results.
 
 ## Acknowledgements
 

@@ -66,6 +66,12 @@ export function Chat({ style }: ChatProps) {
                 messagesForRequest,
                 settings.systemPrompt || "",
               ),
+              mcp: {
+                enabled: !!settings.mcpEnabled,
+                command: settings.mcpServerCommand || "",
+                argsText: settings.mcpServerArgs || "",
+                cwd: settings.mcpServerCwd || "",
+              },
             }),
           )
         : await window.electronAi.promptStreaming(message, {

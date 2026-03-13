@@ -45,6 +45,7 @@ const FLAGS = {
 
 const EXTERNAL_DEPENDENCIES = [
   "@electron/llm",
+  "@modelcontextprotocol/sdk",
   "node-llama-cpp",
   "@node-llama-cpp/",
   "electron-log",
@@ -486,7 +487,9 @@ function getArch() {
   // If we're running in CI, we want to use the arch passed in
   // If someone is passing in a flag, we want to use that, too
   if (process.env.CI || process.argv.some((s) => s.includes("arch"))) {
-    return process.argv.some((s) => s.includes("--arch=arm64")) ? "arm64" : "x64";
+    return process.argv.some((s) => s.includes("--arch=arm64"))
+      ? "arm64"
+      : "x64";
   }
 
   return process.arch;

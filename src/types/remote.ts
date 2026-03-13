@@ -5,6 +5,13 @@ export interface RemotePromptMessage {
   content: string;
 }
 
+export interface RemoteMcpConfig {
+  enabled: boolean;
+  command?: string;
+  argsText?: string;
+  cwd?: string;
+}
+
 export interface RemotePromptRequest {
   requestUUID: string;
   endpoint: string;
@@ -12,4 +19,5 @@ export interface RemotePromptRequest {
   apiKey?: string;
   temperature?: number;
   messages: RemotePromptMessage[];
+  mcp?: RemoteMcpConfig;
 }

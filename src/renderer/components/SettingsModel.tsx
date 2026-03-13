@@ -6,11 +6,7 @@ import { clippyApi } from "../clippyApi";
 import { prettyDownloadSpeed } from "../helpers/convert-download-speed";
 import { ManagedModel } from "../../models";
 import { isModelDownloading } from "../../helpers/model-helpers";
-import {
-  isRemoteModelConfigured,
-  isRemoteProvider,
-  ModelProvider,
-} from "../../sharedState";
+import { isRemoteProvider, ModelProvider } from "../../sharedState";
 
 export const SettingsModel: React.FC = () => {
   const { models, settings } = useSharedState();
@@ -25,11 +21,25 @@ export const SettingsModel: React.FC = () => {
   const [tempRemoteApiKey, setTempRemoteApiKey] = useState(
     settings.remoteApiKey || "",
   );
+  const [tempMcpEnabled, setTempMcpEnabled] = useState(!!settings.mcpEnabled);
+  const [tempMcpServerCommand, setTempMcpServerCommand] = useState(
+    settings.mcpServerCommand || "",
+  );
+  const [tempMcpServerArgs, setTempMcpServerArgs] = useState(
+    settings.mcpServerArgs || "",
+  );
+  const [tempMcpServerCwd, setTempMcpServerCwd] = useState(
+    settings.mcpServerCwd || "",
+  );
   const hasRemoteEditsRef = useRef(false);
   const latestSettingsRef = useRef(settings);
   const latestRemoteEndpointRef = useRef(tempRemoteEndpoint);
   const latestRemoteModelRef = useRef(tempRemoteModel);
   const latestRemoteApiKeyRef = useRef(tempRemoteApiKey);
+  const latestMcpEnabledRef = useRef(tempMcpEnabled);
+  const latestMcpServerCommandRef = useRef(tempMcpServerCommand);
+  const latestMcpServerArgsRef = useRef(tempMcpServerArgs);
+  const latestMcpServerCwdRef = useRef(tempMcpServerCwd);
 
   const columns: Array<Column> = [
     { key: "default", header: "Loaded", width: 50 },
@@ -61,6 +71,8 @@ export const SettingsModel: React.FC = () => {
     models?.[modelKeys[selectedIndex] as keyof typeof models] || null;
   const isDownloading = isModelDownloading(selectedModel);
   const isDefaultModel = selectedModel?.name === settings.selectedModel;
+  const isRemoteConfigComplete =
+    !!tempRemoteEndpoint.trim() && !!tempRemoteModel.trim();
 
   // Handlers
   // ---------------------------------------------------------------------------
@@ -107,6 +119,10 @@ export const SettingsModel: React.FC = () => {
       remoteEndpoint: tempRemoteEndpoint,
       remoteModel: tempRemoteModel,
       remoteApiKey: tempRemoteApiKey,
+      mcpEnabled: tempMcpEnabled,
+      mcpServerCommand: tempMcpServerCommand,
+      mcpServerArgs: tempMcpServerArgs,
+      mcpServerCwd: tempMcpServerCwd,
     });
   };
 
@@ -126,6 +142,22 @@ export const SettingsModel: React.FC = () => {
     latestRemoteApiKeyRef.current = tempRemoteApiKey;
   }, [tempRemoteApiKey]);
 
+  useEffect(() => {
+    latestMcpEnabledRef.current = tempMcpEnabled;
+  }, [tempMcpEnabled]);
+
+  useEffect(() => {
+    latestMcpServerCommandRef.current = tempMcpServerCommand;
+  }, [tempMcpServerCommand]);
+
+  useEffect(() => {
+    latestMcpServerArgsRef.current = tempMcpServerArgs;
+  }, [tempMcpServerArgs]);
+
+  useEffect(() => {
+    latestMcpServerCwdRef.current = tempMcpServerCwd;
+  }, [tempMcpServerCwd]);
+
   // Keep local drafts in sync if settings are changed externally.
   useEffect(() => {
     if (hasRemoteEditsRef.current) {
@@ -135,7 +167,19 @@ export const SettingsModel: React.FC = () => {
     setTempRemoteEndpoint(settings.remoteEndpoint || "");
     setTempRemoteModel(settings.remoteModel || "");
     setTempRemoteApiKey(settings.remoteApiKey || "");
-  }, [settings.remoteEndpoint, settings.remoteModel, settings.remoteApiKey]);
+    setTempMcpEnabled(!!settings.mcpEnabled);
+    setTempMcpServerCommand(settings.mcpServerCommand || "");
+    setTempMcpServerArgs(settings.mcpServerArgs || "");
+    setTempMcpServerCwd(settings.mcpServerCwd || "");
+  }, [
+    settings.remoteEndpoint,
+    settings.remoteModel,
+    settings.remoteApiKey,
+    settings.mcpEnabled,
+    settings.mcpServerCommand,
+    settings.mcpServerArgs,
+    settings.mcpServerCwd,
+  ]);
 
   // Persist pending edits when leaving this view.
   useEffect(() => {
@@ -150,6 +194,10 @@ export const SettingsModel: React.FC = () => {
         remoteEndpoint: latestRemoteEndpointRef.current,
         remoteModel: latestRemoteModelRef.current,
         remoteApiKey: latestRemoteApiKeyRef.current,
+        mcpEnabled: latestMcpEnabledRef.current,
+        mcpServerCommand: latestMcpServerCommandRef.current,
+        mcpServerArgs: latestMcpServerArgsRef.current,
+        mcpServerCwd: latestMcpServerCwdRef.current,
       });
     };
   }, []);
@@ -228,7 +276,75 @@ export const SettingsModel: React.FC = () => {
               onBlur={saveRemoteSettings}
             />
           </div>
-          {!isRemoteModelConfigured(settings) && (
+          <fieldset style={{ marginTop: 12 }}>
+            <legend>MCP Tooling</legend>
+            <div className="field-row">
+              <input
+                id="mcpEnabled"
+                type="checkbox"
+                checked={tempMcpEnabled}
+                onChange={(event) => {
+                  hasRemoteEditsRef.current = true;
+                  setTempMcpEnabled(event.target.checked);
+                }}
+                onBlur={saveRemoteSettings}
+              />
+              <label htmlFor="mcpEnabled">
+                Enable MCP tools for remote chat
+              </label>
+            </div>
+
+            {tempMcpEnabled && (
+              <>
+                <div className="field-row-stacked">
+                  <label htmlFor="mcpServerCommand">MCP Server Command</label>
+                  <input
+                    id="mcpServerCommand"
+                    type="text"
+                    value={tempMcpServerCommand}
+                    onChange={(event) => {
+                      hasRemoteEditsRef.current = true;
+                      setTempMcpServerCommand(event.target.value);
+                    }}
+                    onBlur={saveRemoteSettings}
+                    placeholder="npx"
+                  />
+                </div>
+                <div className="field-row-stacked">
+                  <label htmlFor="mcpServerArgs">MCP Server Args</label>
+                  <input
+                    id="mcpServerArgs"
+                    type="text"
+                    value={tempMcpServerArgs}
+                    onChange={(event) => {
+                      hasRemoteEditsRef.current = true;
+                      setTempMcpServerArgs(event.target.value);
+                    }}
+                    onBlur={saveRemoteSettings}
+                    placeholder="-y @modelcontextprotocol/server-filesystem /Users/abe/projects/clippy"
+                  />
+                </div>
+                <div className="field-row-stacked">
+                  <label htmlFor="mcpServerCwd">MCP Server Working Dir</label>
+                  <input
+                    id="mcpServerCwd"
+                    type="text"
+                    value={tempMcpServerCwd}
+                    onChange={(event) => {
+                      hasRemoteEditsRef.current = true;
+                      setTempMcpServerCwd(event.target.value);
+                    }}
+                    onBlur={saveRemoteSettings}
+                    placeholder="/Users/abe/projects/clippy"
+                  />
+                </div>
+                {!tempMcpServerCommand.trim() && (
+                  <p>Set MCP Server Command to use tools.</p>
+                )}
+              </>
+            )}
+          </fieldset>
+          {!isRemoteConfigComplete && (
             <p>Set both endpoint and model name before sending messages.</p>
           )}
           <p style={{ marginBottom: 0 }}>

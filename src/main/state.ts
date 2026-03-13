@@ -68,6 +68,22 @@ export class StateManager {
       settings.remoteApiKey = "";
     }
 
+    if (settings.mcpEnabled === undefined) {
+      settings.mcpEnabled = false;
+    }
+
+    if (settings.mcpServerCommand === undefined) {
+      settings.mcpServerCommand = "";
+    }
+
+    if (settings.mcpServerArgs === undefined) {
+      settings.mcpServerArgs = "";
+    }
+
+    if (settings.mcpServerCwd === undefined) {
+      settings.mcpServerCwd = "";
+    }
+
     this.store.set("settings", settings);
   }
 

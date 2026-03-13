@@ -50,6 +50,7 @@
   },
   "dependencies": {
     "@electron/llm": "^1.1.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "98.css": "^0.1.21",
     "date-fns": "^4.1.0",
     "electron-context-menu": "^4.0.5",
