@@ -52,6 +52,22 @@ export class StateManager {
       settings.temperature = 0.7;
     }
 
+    if (settings.modelProvider === undefined) {
+      settings.modelProvider = "local";
+    }
+
+    if (settings.remoteEndpoint === undefined) {
+      settings.remoteEndpoint = "https://api.openai.com/v1/chat/completions";
+    }
+
+    if (settings.remoteModel === undefined) {
+      settings.remoteModel = "";
+    }
+
+    if (settings.remoteApiKey === undefined) {
+      settings.remoteApiKey = "";
+    }
+
     this.store.set("settings", settings);
   }
 

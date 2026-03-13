@@ -4,7 +4,10 @@ import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
 import { ANIMATION_KEYS_BRACKETS } from "../clippy-animation-helpers";
 import { useChat } from "../contexts/ChatContext";
-import { electronAi } from "../clippyApi";
+import { clippyApi, electronAi } from "../clippyApi";
+import { isRemoteProvider } from "../../sharedState";
+import { useSharedState } from "../contexts/SharedStateContext";
+import { RemotePromptMessage } from "../../types/remote";
 
 export type ChatProps = {
   style?: React.CSSProperties;
@@ -13,13 +16,20 @@ export type ChatProps = {
 export function Chat({ style }: ChatProps) {
   const { setAnimationKey, setStatus, status, messages, addMessage } =
     useChat();
+  const { settings } = useSharedState();
   const [streamingMessageContent, setStreamingMessageContent] =
     useState<string>("");
   const [lastRequestUUID, setLastRequestUUID] = useState<string>(
     crypto.randomUUID(),
   );
+  const useRemoteModel = isRemoteProvider(settings);
 
   const handleAbortMessage = () => {
+    if (useRemoteModel) {
+      void clippyApi.abortRemotePrompt(lastRequestUUID);
+      return;
+    }
+
     electronAi.abortRequest(lastRequestUUID);
   };
 
@@ -34,6 +44,7 @@ export function Chat({ style }: ChatProps) {
       sender: "user",
       createdAt: Date.now(),
     };
+    const messagesForRequest = [...messages, userMessage];
 
     await addMessage(userMessage);
     setStreamingMessageContent("");
@@ -43,9 +54,23 @@ export function Chat({ style }: ChatProps) {
       const requestUUID = crypto.randomUUID();
       setLastRequestUUID(requestUUID);
 
-      const response = await window.electronAi.promptStreaming(message, {
-        requestUUID,
-      });
+      const response = useRemoteModel
+        ? textToAsyncIterator(
+            await clippyApi.promptRemote({
+              requestUUID,
+              endpoint: settings.remoteEndpoint || "",
+              model: settings.remoteModel || "",
+              apiKey: settings.remoteApiKey || "",
+              temperature: settings.temperature,
+              messages: messagesToRemotePrompts(
+                messagesForRequest,
+                settings.systemPrompt || "",
+              ),
+            }),
+          )
+        : await window.electronAi.promptStreaming(message, {
+            requestUUID,
+          });
 
       let fullContent = "";
       let filteredContent = "";
@@ -86,7 +111,9 @@ export function Chat({ style }: ChatProps) {
 
       addMessage(assistantMessage);
     } catch (error) {
-      console.error(error);
+      if ((error as Error).message !== "Remote request aborted.") {
+        console.error(error);
+      }
     } finally {
       setStreamingMessageContent("");
       setStatus("idle");
@@ -142,4 +169,39 @@ function filterMessageContent(content: string): {
   }
 
   return { text, animationKey };
+}
+
+async function* textToAsyncIterator(
+  content: string,
+): AsyncGenerator<string, void, unknown> {
+  yield content;
+}
+
+function messagesToRemotePrompts(
+  messages: Message[],
+  systemPrompt: string,
+): RemotePromptMessage[] {
+  const resolvedSystemPrompt = systemPrompt.replace(
+    "[LIST OF ANIMATIONS]",
+    ANIMATION_KEYS_BRACKETS.join(", "),
+  );
+  const prompts: RemotePromptMessage[] = [
+    {
+      role: "system",
+      content: resolvedSystemPrompt,
+    },
+  ];
+
+  for (const message of messages) {
+    if (!message.content?.trim()) {
+      continue;
+    }
+
+    prompts.push({
+      role: message.sender === "clippy" ? "assistant" : "user",
+      content: message.content,
+    });
+  }
+
+  return prompts;
 }

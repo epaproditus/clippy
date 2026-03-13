@@ -6,10 +6,16 @@ import { clippyApi } from "../clippyApi";
 import { prettyDownloadSpeed } from "../helpers/convert-download-speed";
 import { ManagedModel } from "../../models";
 import { isModelDownloading } from "../../helpers/model-helpers";
+import {
+  isRemoteModelConfigured,
+  isRemoteProvider,
+  ModelProvider,
+} from "../../sharedState";
 
 export const SettingsModel: React.FC = () => {
   const { models, settings } = useSharedState();
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const useRemoteModel = isRemoteProvider(settings);
 
   const columns: Array<Column> = [
     { key: "default", header: "Loaded", width: 50 },
@@ -45,6 +51,10 @@ export const SettingsModel: React.FC = () => {
   // Handlers
   // ---------------------------------------------------------------------------
   const handleRowSelect = (index: number) => {
+    if (useRemoteModel) {
+      return;
+    }
+
     setSelectedIndex(index);
   };
 
@@ -68,8 +78,91 @@ export const SettingsModel: React.FC = () => {
     }
   };
 
+  const handleProviderChange = (provider: ModelProvider) => {
+    clippyApi.setState("settings.modelProvider", provider);
+  };
+
   return (
     <div>
+      <fieldset>
+        <legend>Provider</legend>
+        <div className="field-row">
+          <input
+            id="modelProviderLocal"
+            type="radio"
+            name="modelProvider"
+            checked={!useRemoteModel}
+            onChange={() => handleProviderChange("local")}
+          />
+          <label htmlFor="modelProviderLocal">Local GGUF (llama.cpp)</label>
+        </div>
+        <div className="field-row">
+          <input
+            id="modelProviderRemote"
+            type="radio"
+            name="modelProvider"
+            checked={useRemoteModel}
+            onChange={() => handleProviderChange("remote")}
+          />
+          <label htmlFor="modelProviderRemote">
+            Remote API (OpenAI-compatible)
+          </label>
+        </div>
+      </fieldset>
+
+      {useRemoteModel && (
+        <fieldset style={{ marginTop: 20 }}>
+          <legend>Remote Settings</legend>
+          <p>
+            Use any endpoint that supports OpenAI-style chat completion
+            requests.
+          </p>
+          <div className="field-row-stacked">
+            <label htmlFor="remoteEndpoint">Endpoint URL</label>
+            <input
+              id="remoteEndpoint"
+              type="text"
+              value={settings.remoteEndpoint || ""}
+              onChange={(event) =>
+                clippyApi.setState(
+                  "settings.remoteEndpoint",
+                  event.target.value,
+                )
+              }
+            />
+          </div>
+          <div className="field-row-stacked">
+            <label htmlFor="remoteModel">Model Name</label>
+            <input
+              id="remoteModel"
+              type="text"
+              value={settings.remoteModel || ""}
+              onChange={(event) =>
+                clippyApi.setState("settings.remoteModel", event.target.value)
+              }
+            />
+          </div>
+          <div className="field-row-stacked">
+            <label htmlFor="remoteApiKey">API Key (optional)</label>
+            <input
+              id="remoteApiKey"
+              type="password"
+              value={settings.remoteApiKey || ""}
+              onChange={(event) =>
+                clippyApi.setState("settings.remoteApiKey", event.target.value)
+              }
+            />
+          </div>
+          {!isRemoteModelConfigured(settings) && (
+            <p>Set both endpoint and model name before sending messages.</p>
+          )}
+          <p style={{ marginBottom: 0 }}>
+            The key is stored in Clippy&apos;s local settings JSON on this
+            machine.
+          </p>
+        </fieldset>
+      )}
+
       <p>
         Select the model you want to use for your chat. The larger the model,
         the more powerful the chat, but the slower it will be - and the more
@@ -84,18 +177,32 @@ export const SettingsModel: React.FC = () => {
 
       <button
         style={{ marginBottom: 10 }}
+        disabled={useRemoteModel}
         onClick={() => clippyApi.addModelFromFile()}
       >
         Add model from file
       </button>
-      <TableView
-        columns={columns}
-        data={data}
-        onRowSelect={handleRowSelect}
-        initialSelectedIndex={selectedIndex}
-      />
+      <div
+        style={{
+          opacity: useRemoteModel ? 0.6 : 1,
+          pointerEvents: useRemoteModel ? "none" : "auto",
+        }}
+      >
+        <TableView
+          columns={columns}
+          data={data}
+          onRowSelect={handleRowSelect}
+          initialSelectedIndex={selectedIndex}
+        />
+      </div>
+      {useRemoteModel && (
+        <p>
+          Local models are still available, but Clippy will use your remote
+          endpoint while this provider is selected.
+        </p>
+      )}
 
-      {selectedModel && (
+      {selectedModel && !useRemoteModel && (
         <div
           className="model-details sunken-panel"
           style={{ marginTop: "20px", padding: "15px" }}

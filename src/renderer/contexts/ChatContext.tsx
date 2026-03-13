@@ -15,6 +15,7 @@ import { ChatRecord, MessageRecord } from "../../types/interfaces";
 import { useDebugState } from "./DebugContext";
 import { ANIMATION_KEYS_BRACKETS } from "../clippy-animation-helpers";
 import { ErrorLoadModelMessageContent } from "../components/ErrorLoadModelMessageContent";
+import { isRemoteModelConfigured, isRemoteProvider } from "../../sharedState";
 
 import type {
   LanguageModelPrompt,
@@ -74,7 +75,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     useState(false);
 
   const getSystemPrompt = useCallback(() => {
-    return settings.systemPrompt.replace(
+    return (settings.systemPrompt || "").replace(
       "[LIST OF ANIMATIONS]",
       ANIMATION_KEYS_BRACKETS.join(", "),
     );
@@ -139,6 +140,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     async (initialPrompts: LanguageModelPrompt[] = []) => {
       setIsModelLoaded(false);
 
+      if (isRemoteProvider(settings)) {
+        if (isRemoteModelConfigured(settings)) {
+          try {
+            await electronAi.destroy();
+          } catch {
+            // Ignore when no local model is active.
+          }
+          setIsModelLoaded(true);
+        }
+
+        return;
+      }
+
+      if (!settings.selectedModel) {
+        return;
+      }
+
       const options: LanguageModelCreateOptions = {
         modelAlias: settings.selectedModel,
         systemPrompt: getSystemPrompt(),
@@ -166,9 +184,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [
       settings.selectedModel,
       settings.systemPrompt,
+      settings.modelProvider,
+      settings.remoteEndpoint,
+      settings.remoteModel,
       settings.topK,
       settings.temperature,
-      messages,
     ],
   );
 
@@ -225,7 +245,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (settings.selectedModel) {
+    if (isRemoteProvider(settings)) {
+      loadModel();
+    } else if (settings.selectedModel) {
       loadModel();
     } else if (!settings.selectedModel && isModelLoaded) {
       electronAi
@@ -240,12 +262,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [
     settings.selectedModel,
     settings.systemPrompt,
+    settings.modelProvider,
+    settings.remoteEndpoint,
+    settings.remoteModel,
     settings.topK,
     settings.temperature,
   ]);
 
   // If selectedModel is undefined or not available, set it to the first downloaded model
   useEffect(() => {
+    if (isRemoteProvider(settings)) {
+      return;
+    }
+
     if (
       !settings.selectedModel ||
       !models[settings.selectedModel] ||
@@ -259,7 +288,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         clippyApi.setState("settings.selectedModel", downloadedModel.name);
       }
     }
-  }, [models]);
+  }, [models, settings.modelProvider]);
 
   // At app startup, initially load the chat records from the main process
   useEffect(() => {
@@ -272,6 +301,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // for our smallest model and tell the user about it.
   useEffect(() => {
     if (
+      isRemoteProvider(settings) ||
       messages.length > 0 ||
       Object.keys(models).length === 0 ||
       areAnyModelsReadyOrDownloading(models)
@@ -302,7 +332,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
 
     void downloadModelIfNoneReady();
-  }, [models]);
+  }, [models, settings.modelProvider]);
 
   // Subscribe to the main process's newChat event
   useEffect(() => {

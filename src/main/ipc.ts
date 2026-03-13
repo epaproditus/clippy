@@ -14,6 +14,8 @@ import { checkForUpdates } from "./update";
 import { getVersions } from "./helpers/getVersions";
 import { getClippyDebugInfo } from "./debug-clippy";
 import { getDebugManager } from "./debug";
+import { abortRemotePrompt, promptRemote } from "./remote";
+import { RemotePromptRequest } from "../types/remote";
 
 export function setupIpcListeners() {
   // Window
@@ -94,6 +96,14 @@ export function setupIpcListeners() {
   );
   ipcMain.handle(IpcMessages.CHAT_DELETE_ALL_CHATS, () =>
     getChatManager().deleteAllChats(),
+  );
+  ipcMain.handle(
+    IpcMessages.CHAT_PROMPT_REMOTE,
+    (_, request: RemotePromptRequest) => promptRemote(request),
+  );
+  ipcMain.handle(
+    IpcMessages.CHAT_ABORT_REMOTE_PROMPT,
+    (_, requestUUID: string) => abortRemotePrompt(requestUUID),
   );
 
   // Clipboard

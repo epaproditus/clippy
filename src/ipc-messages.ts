@@ -40,6 +40,8 @@ export const IpcMessages = {
   CHAT_DELETE_CHAT: "clippy_chat_delete_chat",
   CHAT_DELETE_ALL_CHATS: "clippy_chat_delete_all_chats",
   CHAT_NEW_CHAT: "clippy_chat_new_chat",
+  CHAT_PROMPT_REMOTE: "clippy_chat_prompt_remote",
+  CHAT_ABORT_REMOTE_PROMPT: "clippy_chat_abort_remote_prompt",
 
   // Clipboard
   CLIPBOARD_WRITE: "clippy_clipboard_write",

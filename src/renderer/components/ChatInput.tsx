@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useChat } from "../contexts/ChatContext";
+import { useSharedState } from "../contexts/SharedStateContext";
+import { isRemoteModelConfigured, isRemoteProvider } from "../../sharedState";
 export type ChatInputProps = {
   onSend: (message: string) => void;
   onAbort: () => void;
@@ -7,6 +9,7 @@ export type ChatInputProps = {
 
 export function ChatInput({ onSend, onAbort }: ChatInputProps) {
   const { status } = useChat();
+  const { settings } = useSharedState();
   const [message, setMessage] = useState("");
   const { isModelLoaded } = useChat();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -60,7 +63,9 @@ export function ChatInput({ onSend, onAbort }: ChatInputProps) {
 
   const placeholder = isModelLoaded
     ? "Type a message, press Enter to send..."
-    : "This is your chat input, we're just waiting for a model to load...";
+    : isRemoteProvider(settings) && !isRemoteModelConfigured(settings)
+      ? "Set your remote endpoint and model in Settings > Model."
+      : "This is your chat input, we're just waiting for a model to load...";
 
   return (
     <div style={{ display: "flex", alignItems: "flex-end" }}>

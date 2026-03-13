@@ -6,10 +6,15 @@ export type DefaultFont =
   | "Tahoma"
   | "System Default";
 export type DefaultFontSize = number;
+export type ModelProvider = "local" | "remote";
 
 export interface SettingsState {
   selectedModel?: string;
   systemPrompt?: string;
+  modelProvider?: ModelProvider;
+  remoteEndpoint?: string;
+  remoteModel?: string;
+  remoteApiKey?: string;
   clippyAlwaysOnTop?: boolean;
   chatAlwaysOnTop?: boolean;
   alwaysOpenChat?: boolean;
@@ -43,12 +48,24 @@ export const DEFAULT_SETTINGS: SettingsState = {
   chatAlwaysOnTop: true,
   alwaysOpenChat: true,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  modelProvider: "local",
+  remoteEndpoint: "https://api.openai.com/v1/chat/completions",
+  remoteModel: "",
+  remoteApiKey: "",
   topK: 10,
   temperature: 0.7,
   defaultFont: "Tahoma",
   defaultFontSize: 12,
   disableAutoUpdate: false,
 };
+
+export function isRemoteProvider(settings: SettingsState): boolean {
+  return settings.modelProvider === "remote";
+}
+
+export function isRemoteModelConfigured(settings: SettingsState): boolean {
+  return !!settings.remoteEndpoint?.trim() && !!settings.remoteModel?.trim();
+}
 
 export const EMPTY_SHARED_STATE: SharedState = {
   models: {},

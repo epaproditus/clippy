@@ -85,6 +85,10 @@ const clippyApi: ClippyApi = {
   deleteChat: (chatId: string) =>
     ipcRenderer.invoke(IpcMessages.CHAT_DELETE_CHAT, chatId),
   deleteAllChats: () => ipcRenderer.invoke(IpcMessages.CHAT_DELETE_ALL_CHATS),
+  promptRemote: (request) =>
+    ipcRenderer.invoke(IpcMessages.CHAT_PROMPT_REMOTE, request),
+  abortRemotePrompt: (requestUUID) =>
+    ipcRenderer.invoke(IpcMessages.CHAT_ABORT_REMOTE_PROMPT, requestUUID),
   onNewChat: (callback: () => void) => {
     ipcRenderer.on(IpcMessages.CHAT_NEW_CHAT, callback);
   },
