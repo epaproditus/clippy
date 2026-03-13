@@ -7,7 +7,7 @@ import {
   Versions,
 } from "../types/interfaces";
 import { DebugState } from "../debugState";
-import { RemotePromptRequest } from "../types/remote";
+import { RemoteMcpServerConfig, RemotePromptRequest } from "../types/remote";
 
 import type { BubbleView } from "./contexts/BubbleViewContext";
 import { Data } from "electron";
@@ -53,6 +53,11 @@ export type ClippyApi = {
   deleteAllChats: () => Promise<void>;
   promptRemote: (request: RemotePromptRequest) => Promise<string>;
   abortRemotePrompt: (requestUUID: string) => Promise<boolean>;
+  verifyMcpServer: (server: RemoteMcpServerConfig) => Promise<{
+    ok: boolean;
+    tools: Array<{ name: string; description?: string }>;
+    error?: string;
+  }>;
   onNewChat: (callback: () => void) => void;
   offNewChat: () => void;
   // Clipboard

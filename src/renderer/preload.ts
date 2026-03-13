@@ -89,6 +89,8 @@ const clippyApi: ClippyApi = {
     ipcRenderer.invoke(IpcMessages.CHAT_PROMPT_REMOTE, request),
   abortRemotePrompt: (requestUUID) =>
     ipcRenderer.invoke(IpcMessages.CHAT_ABORT_REMOTE_PROMPT, requestUUID),
+  verifyMcpServer: (server) =>
+    ipcRenderer.invoke(IpcMessages.CHAT_VERIFY_MCP_SERVER, server),
   onNewChat: (callback: () => void) => {
     ipcRenderer.on(IpcMessages.CHAT_NEW_CHAT, callback);
   },

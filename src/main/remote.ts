@@ -1,15 +1,27 @@
 import { getLogger } from "./logger";
-import { RemotePromptRequest } from "../types/remote";
+import {
+  RemoteMcpConfig,
+  RemoteMcpServerConfig,
+  RemotePromptRequest,
+} from "../types/remote";
 import { callMcpTool, listMcpTools, McpToolDefinition } from "./mcp";
 
 const activeRequests = new Map<string, AbortController>();
 const MAX_TOOL_CALL_ROUNDS = 8;
 
+type ToolLookupEntry = {
+  server: RemoteMcpServerConfig;
+  toolName: string;
+};
+
 export async function promptRemote(
   request: RemotePromptRequest,
 ): Promise<string> {
-  const endpoint = request.endpoint.trim();
-  const model = request.model.trim();
+  const endpoint =
+    request.provider?.baseUrl?.trim() || request.endpoint?.trim() || "";
+  const model = request.provider?.model?.trim() || request.model?.trim() || "";
+  const apiKey =
+    request.provider?.apiKey?.trim() || request.apiKey?.trim() || "";
 
   if (!endpoint) {
     throw new Error("Remote endpoint is required.");
@@ -37,12 +49,15 @@ export async function promptRemote(
       "Content-Type": "application/json",
     };
 
-    if (request.apiKey?.trim()) {
-      headers["Authorization"] = `Bearer ${request.apiKey.trim()}`;
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    const mcpToolDefinitions = await listMcpTools(request.mcp);
-    const remoteTools = toOpenAiTools(mcpToolDefinitions);
+    const toolLookup = new Map<string, ToolLookupEntry>();
+    const remoteTools = await buildRemoteTools(
+      resolveAutoRunMcpServers(request),
+      toolLookup,
+    );
 
     for (let round = 0; round < MAX_TOOL_CALL_ROUNDS; round++) {
       const payload = await createRemoteResponse({
@@ -89,7 +104,7 @@ export async function promptRemote(
       });
 
       for (const toolCall of toolCalls) {
-        const toolResult = await executeToolCall(request, toolCall);
+        const toolResult = await executeToolCall(toolLookup, toolCall);
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
@@ -149,6 +164,116 @@ async function createRemoteResponse({
   }
 
   return (await response.json()) as Record<string, unknown>;
+}
+
+async function buildRemoteTools(
+  servers: RemoteMcpServerConfig[],
+  toolLookup: Map<string, ToolLookupEntry>,
+): Promise<Array<Record<string, unknown>>> {
+  const remoteTools: Array<Record<string, unknown>> = [];
+
+  for (const server of servers) {
+    try {
+      const serverTools = await listMcpTools(server);
+
+      for (const tool of serverTools) {
+        if (!tool.toolName) {
+          continue;
+        }
+
+        const alias = createUniqueToolAlias(tool, toolLookup);
+
+        toolLookup.set(alias, {
+          server,
+          toolName: tool.toolName,
+        });
+
+        remoteTools.push({
+          type: "function",
+          function: {
+            name: alias,
+            description: `[${server.name}] ${tool.description || tool.toolName}`,
+            parameters: tool.inputSchema || {
+              type: "object",
+              properties: {},
+            },
+          },
+        });
+      }
+    } catch (error) {
+      getLogger().warn(`Failed to list MCP tools for ${server.name}`, error);
+    }
+  }
+
+  return remoteTools;
+}
+
+function createUniqueToolAlias(
+  tool: McpToolDefinition,
+  toolLookup: Map<string, ToolLookupEntry>,
+): string {
+  const serverToken = sanitizeToolToken(tool.serverToolId || tool.serverId);
+  const toolToken = sanitizeToolToken(tool.toolName);
+  const base = `${serverToken}__${toolToken}`.slice(0, 64) || "tool";
+
+  if (!toolLookup.has(base)) {
+    return base;
+  }
+
+  let suffix = 2;
+  let candidate = `${base.slice(0, 60)}_${suffix}`;
+
+  while (toolLookup.has(candidate)) {
+    suffix += 1;
+    candidate = `${base.slice(0, 60)}_${suffix}`;
+  }
+
+  return candidate;
+}
+
+function sanitizeToolToken(value: string): string {
+  const sanitized = value
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_");
+
+  return sanitized || "tool";
+}
+
+function resolveAutoRunMcpServers(
+  request: RemotePromptRequest,
+): RemoteMcpServerConfig[] {
+  const configuredServers = (request.mcpServers || []).filter(
+    (server) => server.enabled && server.runToolsAutomatically,
+  );
+
+  if (configuredServers.length > 0) {
+    return configuredServers;
+  }
+
+  if (!request.mcp?.enabled) {
+    return [];
+  }
+
+  return [legacyMcpServerFromConfig(request.mcp)];
+}
+
+function legacyMcpServerFromConfig(
+  config: RemoteMcpConfig,
+): RemoteMcpServerConfig {
+  return {
+    id: "legacy-mcp",
+    name: "Legacy MCP",
+    toolId: "legacy",
+    enabled: !!config.enabled,
+    runToolsAutomatically: true,
+    type: config.type || "stdio",
+    command: config.command,
+    argsText: config.argsText,
+    cwd: config.cwd,
+    url: config.url,
+    headers: config.headers || [],
+  };
 }
 
 async function readResponseText(response: Response): Promise<string> {
@@ -247,28 +372,14 @@ function getToolCalls(value: unknown): OpenAiToolCall[] {
     .filter((toolCall): toolCall is OpenAiToolCall => !!toolCall);
 }
 
-function toOpenAiTools(
-  mcpTools: McpToolDefinition[],
-): Array<Record<string, unknown>> {
-  return mcpTools.map((tool) => ({
-    type: "function",
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.inputSchema || {
-        type: "object",
-        properties: {},
-      },
-    },
-  }));
-}
-
 async function executeToolCall(
-  request: RemotePromptRequest,
+  toolLookup: Map<string, ToolLookupEntry>,
   toolCall: OpenAiToolCall,
 ): Promise<string> {
-  if (!request.mcp?.enabled) {
-    return "MCP is not enabled in settings.";
+  const match = toolLookup.get(toolCall.name);
+
+  if (!match) {
+    return `Unknown tool requested: ${toolCall.name}`;
   }
 
   let parsedArgs: Record<string, unknown> = {};
@@ -280,7 +391,7 @@ async function executeToolCall(
   }
 
   try {
-    const result = await callMcpTool(request.mcp, toolCall.name, parsedArgs);
+    const result = await callMcpTool(match.server, match.toolName, parsedArgs);
     return stringifyToolResult(result);
   } catch (error) {
     getLogger().error(`MCP tool call failed: ${toolCall.name}`, error);

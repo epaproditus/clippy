@@ -5,7 +5,11 @@ import { ChatInput } from "./ChatInput";
 import { ANIMATION_KEYS_BRACKETS } from "../clippy-animation-helpers";
 import { useChat } from "../contexts/ChatContext";
 import { clippyApi, electronAi } from "../clippyApi";
-import { isRemoteProvider } from "../../sharedState";
+import {
+  getMcpServers,
+  getSelectedRemoteProvider,
+  isRemoteProvider,
+} from "../../sharedState";
 import { useSharedState } from "../contexts/SharedStateContext";
 import { RemotePromptMessage } from "../../types/remote";
 
@@ -53,19 +57,50 @@ export function Chat({ style }: ChatProps) {
     try {
       const requestUUID = crypto.randomUUID();
       setLastRequestUUID(requestUUID);
+      const selectedRemoteProvider = getSelectedRemoteProvider(settings);
 
       const response = useRemoteModel
         ? textToAsyncIterator(
             await clippyApi.promptRemote({
               requestUUID,
-              endpoint: settings.remoteEndpoint || "",
-              model: settings.remoteModel || "",
-              apiKey: settings.remoteApiKey || "",
+              endpoint:
+                selectedRemoteProvider?.baseUrl ||
+                settings.remoteEndpoint ||
+                "",
+              model:
+                selectedRemoteProvider?.model || settings.remoteModel || "",
+              apiKey:
+                selectedRemoteProvider?.apiKey || settings.remoteApiKey || "",
+              provider: selectedRemoteProvider
+                ? {
+                    id: selectedRemoteProvider.id,
+                    name: selectedRemoteProvider.name,
+                    apiKey: selectedRemoteProvider.apiKey,
+                    baseUrl: selectedRemoteProvider.baseUrl,
+                    model: selectedRemoteProvider.model,
+                  }
+                : undefined,
               temperature: settings.temperature,
               messages: messagesToRemotePrompts(
                 messagesForRequest,
                 settings.systemPrompt || "",
               ),
+              mcpServers: getMcpServers(settings).map((server) => ({
+                id: server.id,
+                name: server.name,
+                toolId: server.toolId,
+                enabled: server.enabled,
+                runToolsAutomatically: server.runToolsAutomatically,
+                type: server.type,
+                command: server.command,
+                argsText: server.argsText,
+                cwd: server.cwd,
+                url: server.url,
+                headers: (server.headers || []).map((header) => ({
+                  key: header.key,
+                  value: header.value,
+                })),
+              })),
               mcp: {
                 enabled: !!settings.mcpEnabled,
                 command: settings.mcpServerCommand || "",

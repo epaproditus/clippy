@@ -7,14 +7,48 @@ export type DefaultFont =
   | "System Default";
 export type DefaultFontSize = number;
 export type ModelProvider = "local" | "remote";
+export type McpServerType = "stdio" | "http";
+
+export interface RemoteProviderConfig {
+  id: string;
+  name: string;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  observed?: boolean;
+}
+
+export interface McpHeaderConfig {
+  id: string;
+  key: string;
+  value: string;
+}
+
+export interface McpServerConfig {
+  id: string;
+  name: string;
+  toolId: string;
+  enabled: boolean;
+  runToolsAutomatically: boolean;
+  type: McpServerType;
+  command?: string;
+  argsText?: string;
+  cwd?: string;
+  url?: string;
+  headers?: McpHeaderConfig[];
+}
 
 export interface SettingsState {
   selectedModel?: string;
   systemPrompt?: string;
   modelProvider?: ModelProvider;
+  remoteProviders?: RemoteProviderConfig[];
+  selectedRemoteProviderId?: string;
   remoteEndpoint?: string;
   remoteModel?: string;
   remoteApiKey?: string;
+  mcpServers?: McpServerConfig[];
+  selectedMcpServerId?: string;
   mcpEnabled?: boolean;
   mcpServerCommand?: string;
   mcpServerArgs?: string;
@@ -53,9 +87,22 @@ export const DEFAULT_SETTINGS: SettingsState = {
   alwaysOpenChat: true,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   modelProvider: "local",
+  remoteProviders: [
+    {
+      id: "openai",
+      name: "OpenAI",
+      apiKey: "",
+      baseUrl: "https://api.openai.com/v1/chat/completions",
+      model: "",
+      observed: false,
+    },
+  ],
+  selectedRemoteProviderId: "openai",
   remoteEndpoint: "https://api.openai.com/v1/chat/completions",
   remoteModel: "",
   remoteApiKey: "",
+  mcpServers: [],
+  selectedMcpServerId: undefined,
   mcpEnabled: false,
   mcpServerCommand: "",
   mcpServerArgs: "",
@@ -72,7 +119,47 @@ export function isRemoteProvider(settings: SettingsState): boolean {
 }
 
 export function isRemoteModelConfigured(settings: SettingsState): boolean {
+  const selectedProvider = getSelectedRemoteProvider(settings);
+
+  if (selectedProvider) {
+    return !!selectedProvider.baseUrl.trim() && !!selectedProvider.model.trim();
+  }
+
   return !!settings.remoteEndpoint?.trim() && !!settings.remoteModel?.trim();
+}
+
+export function getRemoteProviders(
+  settings: SettingsState,
+): RemoteProviderConfig[] {
+  return settings.remoteProviders || [];
+}
+
+export function getSelectedRemoteProvider(
+  settings: SettingsState,
+): RemoteProviderConfig | undefined {
+  const providers = getRemoteProviders(settings);
+
+  if (providers.length === 0) {
+    return undefined;
+  }
+
+  const selected = providers.find(
+    (provider) => provider.id === settings.selectedRemoteProviderId,
+  );
+
+  return selected || providers[0];
+}
+
+export function getMcpServers(settings: SettingsState): McpServerConfig[] {
+  return settings.mcpServers || [];
+}
+
+export function getAutoRunMcpServers(
+  settings: SettingsState,
+): McpServerConfig[] {
+  return getMcpServers(settings).filter(
+    (server) => server.enabled && server.runToolsAutomatically,
+  );
 }
 
 export const EMPTY_SHARED_STATE: SharedState = {

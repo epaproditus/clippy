@@ -84,6 +84,61 @@ export class StateManager {
       settings.mcpServerCwd = "";
     }
 
+    if (!settings.remoteProviders || settings.remoteProviders.length === 0) {
+      settings.remoteProviders = [
+        {
+          id: "legacy-remote",
+          name: "Remote",
+          apiKey: settings.remoteApiKey || "",
+          baseUrl:
+            settings.remoteEndpoint ||
+            "https://api.openai.com/v1/chat/completions",
+          model: settings.remoteModel || "",
+          observed: false,
+        },
+      ];
+    }
+
+    const hasSelectedRemoteProvider = settings.remoteProviders.some(
+      (provider) => provider.id === settings.selectedRemoteProviderId,
+    );
+
+    if (!hasSelectedRemoteProvider) {
+      settings.selectedRemoteProviderId = settings.remoteProviders[0]?.id;
+    }
+
+    if (!settings.mcpServers || settings.mcpServers.length === 0) {
+      const shouldMigrateLegacyMcp =
+        !!settings.mcpEnabled ||
+        !!settings.mcpServerCommand ||
+        !!settings.mcpServerArgs;
+
+      settings.mcpServers = shouldMigrateLegacyMcp
+        ? [
+            {
+              id: "legacy-mcp",
+              name: "Legacy MCP",
+              toolId: "legacy",
+              enabled: !!settings.mcpEnabled,
+              runToolsAutomatically: true,
+              type: "stdio",
+              command: settings.mcpServerCommand || "",
+              argsText: settings.mcpServerArgs || "",
+              cwd: settings.mcpServerCwd || "",
+              headers: [],
+            },
+          ]
+        : [];
+    }
+
+    const hasSelectedMcpServer = settings.mcpServers.some(
+      (server) => server.id === settings.selectedMcpServerId,
+    );
+
+    if (!hasSelectedMcpServer) {
+      settings.selectedMcpServerId = settings.mcpServers[0]?.id;
+    }
+
     this.store.set("settings", settings);
   }
 

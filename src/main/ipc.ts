@@ -15,7 +15,8 @@ import { getVersions } from "./helpers/getVersions";
 import { getClippyDebugInfo } from "./debug-clippy";
 import { getDebugManager } from "./debug";
 import { abortRemotePrompt, promptRemote } from "./remote";
-import { RemotePromptRequest } from "../types/remote";
+import { RemoteMcpServerConfig, RemotePromptRequest } from "../types/remote";
+import { verifyMcpServer } from "./mcp";
 
 export function setupIpcListeners() {
   // Window
@@ -104,6 +105,10 @@ export function setupIpcListeners() {
   ipcMain.handle(
     IpcMessages.CHAT_ABORT_REMOTE_PROMPT,
     (_, requestUUID: string) => abortRemotePrompt(requestUUID),
+  );
+  ipcMain.handle(
+    IpcMessages.CHAT_VERIFY_MCP_SERVER,
+    (_, server: RemoteMcpServerConfig) => verifyMcpServer(server),
   );
 
   // Clipboard
