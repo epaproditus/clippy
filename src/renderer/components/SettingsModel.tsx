@@ -1,6 +1,6 @@
 import { Column, TableView } from "./TableView";
 import { Progress } from "./Progress";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSharedState } from "../contexts/SharedStateContext";
 import { clippyApi } from "../clippyApi";
 import { prettyDownloadSpeed } from "../helpers/convert-download-speed";
@@ -16,6 +16,20 @@ export const SettingsModel: React.FC = () => {
   const { models, settings } = useSharedState();
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const useRemoteModel = isRemoteProvider(settings);
+  const [tempRemoteEndpoint, setTempRemoteEndpoint] = useState(
+    settings.remoteEndpoint || "",
+  );
+  const [tempRemoteModel, setTempRemoteModel] = useState(
+    settings.remoteModel || "",
+  );
+  const [tempRemoteApiKey, setTempRemoteApiKey] = useState(
+    settings.remoteApiKey || "",
+  );
+  const hasRemoteEditsRef = useRef(false);
+  const latestSettingsRef = useRef(settings);
+  const latestRemoteEndpointRef = useRef(tempRemoteEndpoint);
+  const latestRemoteModelRef = useRef(tempRemoteModel);
+  const latestRemoteApiKeyRef = useRef(tempRemoteApiKey);
 
   const columns: Array<Column> = [
     { key: "default", header: "Loaded", width: 50 },
@@ -82,6 +96,64 @@ export const SettingsModel: React.FC = () => {
     clippyApi.setState("settings.modelProvider", provider);
   };
 
+  const saveRemoteSettings = () => {
+    if (!hasRemoteEditsRef.current) {
+      return;
+    }
+
+    hasRemoteEditsRef.current = false;
+    clippyApi.setState("settings", {
+      ...settings,
+      remoteEndpoint: tempRemoteEndpoint,
+      remoteModel: tempRemoteModel,
+      remoteApiKey: tempRemoteApiKey,
+    });
+  };
+
+  useEffect(() => {
+    latestSettingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    latestRemoteEndpointRef.current = tempRemoteEndpoint;
+  }, [tempRemoteEndpoint]);
+
+  useEffect(() => {
+    latestRemoteModelRef.current = tempRemoteModel;
+  }, [tempRemoteModel]);
+
+  useEffect(() => {
+    latestRemoteApiKeyRef.current = tempRemoteApiKey;
+  }, [tempRemoteApiKey]);
+
+  // Keep local drafts in sync if settings are changed externally.
+  useEffect(() => {
+    if (hasRemoteEditsRef.current) {
+      return;
+    }
+
+    setTempRemoteEndpoint(settings.remoteEndpoint || "");
+    setTempRemoteModel(settings.remoteModel || "");
+    setTempRemoteApiKey(settings.remoteApiKey || "");
+  }, [settings.remoteEndpoint, settings.remoteModel, settings.remoteApiKey]);
+
+  // Persist pending edits when leaving this view.
+  useEffect(() => {
+    return () => {
+      if (!hasRemoteEditsRef.current) {
+        return;
+      }
+
+      hasRemoteEditsRef.current = false;
+      clippyApi.setState("settings", {
+        ...latestSettingsRef.current,
+        remoteEndpoint: latestRemoteEndpointRef.current,
+        remoteModel: latestRemoteModelRef.current,
+        remoteApiKey: latestRemoteApiKeyRef.current,
+      });
+    };
+  }, []);
+
   return (
     <div>
       <fieldset>
@@ -122,13 +194,12 @@ export const SettingsModel: React.FC = () => {
             <input
               id="remoteEndpoint"
               type="text"
-              value={settings.remoteEndpoint || ""}
-              onChange={(event) =>
-                clippyApi.setState(
-                  "settings.remoteEndpoint",
-                  event.target.value,
-                )
-              }
+              value={tempRemoteEndpoint}
+              onChange={(event) => {
+                hasRemoteEditsRef.current = true;
+                setTempRemoteEndpoint(event.target.value);
+              }}
+              onBlur={saveRemoteSettings}
             />
           </div>
           <div className="field-row-stacked">
@@ -136,10 +207,12 @@ export const SettingsModel: React.FC = () => {
             <input
               id="remoteModel"
               type="text"
-              value={settings.remoteModel || ""}
-              onChange={(event) =>
-                clippyApi.setState("settings.remoteModel", event.target.value)
-              }
+              value={tempRemoteModel}
+              onChange={(event) => {
+                hasRemoteEditsRef.current = true;
+                setTempRemoteModel(event.target.value);
+              }}
+              onBlur={saveRemoteSettings}
             />
           </div>
           <div className="field-row-stacked">
@@ -147,10 +220,12 @@ export const SettingsModel: React.FC = () => {
             <input
               id="remoteApiKey"
               type="password"
-              value={settings.remoteApiKey || ""}
-              onChange={(event) =>
-                clippyApi.setState("settings.remoteApiKey", event.target.value)
-              }
+              value={tempRemoteApiKey}
+              onChange={(event) => {
+                hasRemoteEditsRef.current = true;
+                setTempRemoteApiKey(event.target.value);
+              }}
+              onBlur={saveRemoteSettings}
             />
           </div>
           {!isRemoteModelConfigured(settings) && (
